@@ -3,12 +3,14 @@ package main
 import (
 	"app/api"
 	"app/config"
+	"app/db"
 
 	"github.com/gin-gonic/gin"
 )
 
 func init() {
 	config.Load()
+	db.InitRedis()
 }
 
 func main() {
