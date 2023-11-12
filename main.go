@@ -65,7 +65,7 @@ type Usage struct {
 
 func main() {
 	router := gin.New()
-	router.POST("/api/v1/gen", gen)
+	router.POST("/api/v1/gen", Rate(), gen)
 	router.Run(":8080")
 }
 
