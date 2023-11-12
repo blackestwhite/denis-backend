@@ -1,13 +1,15 @@
 package main
 
 import (
+	"app/config"
+	"app/db"
+	"app/entity"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/blackestwhite/presenter"
@@ -15,52 +17,8 @@ import (
 	"github.com/gomodule/redigo/redis"
 )
 
-var key = ""
-var RedisPool *redis.Pool
-
 func init() {
-	key = os.Getenv("OPEN_AI_KEY")
-
-	RedisPool = &redis.Pool{
-		MaxIdle:   80,
-		MaxActive: 12000,
-		Dial: func() (redis.Conn, error) {
-			conn, err := redis.Dial("tcp", os.Getenv("REDIS_URL"))
-			if err != nil {
-				log.Printf("ERROR: fail init redis pool: %s", err.Error())
-				os.Exit(1)
-			}
-			return conn, err
-		},
-	}
-}
-
-type ChatCompletion struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-}
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type ChatRes struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
-	Usage   Usage    `json:"usage"`
-}
-type Choice struct {
-	Index        int     `json:"index"`
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
-}
-type Usage struct {
-	PromptTokens    int `json:"prompt_tokens"`
-	CompletionToken int `json:"completion_tokens"`
-	TotalTokens     int `json:"total_tokens"`
+	config.Load()
 }
 
 func main() {
@@ -69,12 +27,8 @@ func main() {
 	router.Run(":8080")
 }
 
-type Prompt struct {
-	Content []Message `json:"content"`
-}
-
 func gen(c *gin.Context) {
-	var prompt Prompt
+	var prompt entity.Prompt
 	err := c.Bind(&prompt)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, presenter.Std{
@@ -84,9 +38,9 @@ func gen(c *gin.Context) {
 		})
 		return
 	}
-	chatCompletion := ChatCompletion{
+	chatCompletion := entity.ChatCompletion{
 		Model: "gpt-3.5-turbo",
-		Messages: []Message{
+		Messages: []entity.Message{
 			{
 				Role: "system",
 				Content: `you are a coding assistant built by Mahdi Akbari and backed by [https://akbari.foundation](akbari.foundation).
@@ -107,7 +61,7 @@ func gen(c *gin.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	req.Header.Add("Authorization", fmt.Sprint("Bearer ", key))
+	req.Header.Add("Authorization", fmt.Sprint("Bearer ", config.KEY))
 	req.Header.Add("Content-Type", "application/json")
 	res, err := client.Do(req)
 	if err != nil {
@@ -119,7 +73,7 @@ func gen(c *gin.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var resp ChatRes
+	var resp entity.ChatRes
 	err = json.Unmarshal(body, &resp)
 	if err != nil {
 		log.Fatal(err)
@@ -133,7 +87,7 @@ func gen(c *gin.Context) {
 
 func Rate() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		pool := RedisPool.Get()
+		pool := db.RedisPool.Get()
 		defer pool.Close()
 		now := time.Now().UnixNano()
 		key := fmt.Sprint(c.ClientIP(), ":", "rate")
