@@ -1,0 +1,30 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up SSH key
+        uses: webfactory/ssh-agent@v0.5.2
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: SSH into VPS and run commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: 116.203.133.93
+          username: root
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            docker rmi $(docker images -f "dangling=true" -q)
+            cd /root/apps/denis-backend
+            docker compose down
+            git pull
+            docker compose up -d --build
