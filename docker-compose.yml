@@ -1,0 +1,21 @@
+version: '3.8'
+services: 
+  redis:
+    image: redis
+    restart: on-failure
+  app:
+    build: .
+    ports:
+      - "8080:8764"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - GIN_MODE=release
+      - OPEN_AI_KEY=${OPEN_AI_KEY}
+    restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100k"
+        max-file: "10"
