@@ -5,6 +5,7 @@ go 1.21
 require (
 	github.com/blackestwhite/presenter v0.0.0-20220816202159-9afd91f05162
 	github.com/gin-gonic/gin v1.9.1
+	github.com/gomodule/redigo v1.8.9
 )
 
 require (

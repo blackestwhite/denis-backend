@@ -8,15 +8,31 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/blackestwhite/presenter"
 	"github.com/gin-gonic/gin"
+	"github.com/gomodule/redigo/redis"
 )
 
 var key = ""
+var RedisPool *redis.Pool
 
 func init() {
 	key = os.Getenv("OPEN_AI_KEY")
+
+	RedisPool = &redis.Pool{
+		MaxIdle:   80,
+		MaxActive: 12000,
+		Dial: func() (redis.Conn, error) {
+			conn, err := redis.Dial("tcp", os.Getenv("REDIS_URL"))
+			if err != nil {
+				log.Printf("ERROR: fail init redis pool: %s", err.Error())
+				os.Exit(1)
+			}
+			return conn, err
+		},
+	}
 }
 
 type ChatCompletion struct {
@@ -113,4 +129,65 @@ func gen(c *gin.Context) {
 		Ok:     true,
 		Result: resp,
 	})
+}
+
+func Rate() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		pool := RedisPool.Get()
+		defer pool.Close()
+		now := time.Now().UnixNano()
+		key := fmt.Sprint(c.ClientIP(), ":", "rate")
+
+		// Define rate limit parameters.
+		maxRequests := 20
+		perDuration := time.Hour
+
+		// Calculate the time window.
+		windowStart := now - int64(perDuration)
+
+		// Count the number of requests made within the time window.
+		count, err := redis.Int(pool.Do("ZCOUNT", key, windowStart, now))
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, presenter.Std{
+				Ok:               false,
+				ErrorCode:        http.StatusInternalServerError,
+				ErrorDescription: err.Error(),
+			})
+			return
+		}
+
+		// Check if the number of requests exceeds the rate limit.
+		if count >= maxRequests {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, presenter.Std{
+				Ok:               false,
+				ErrorCode:        http.StatusInternalServerError,
+				ErrorDescription: "rate limit exceeded",
+			})
+			return
+		}
+
+		// If not exceeded, add the current request's timestamp to the sorted set.
+		_, err = pool.Do("ZADD", key, now, now)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, presenter.Std{
+				Ok:               false,
+				ErrorCode:        http.StatusInternalServerError,
+				ErrorDescription: err.Error(),
+			})
+			return
+		}
+
+		// Expire the key after the rate limiting window to save memory.
+		_, err = pool.Do("EXPIRE", key, perDuration.Seconds())
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, presenter.Std{
+				Ok:               false,
+				ErrorCode:        http.StatusInternalServerError,
+				ErrorDescription: err.Error(),
+			})
+			return
+		}
+
+		c.Next()
+	}
 }
