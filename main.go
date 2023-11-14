@@ -4,11 +4,13 @@ import (
 	"app/api"
 	"app/config"
 	"app/db"
+	"log"
 
 	"github.com/gin-gonic/gin"
 )
 
 func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	config.Load()
 	db.InitRedis()
 }
