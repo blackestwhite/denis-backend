@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/blackestwhite/presenter"
 	"github.com/google/uuid"
@@ -86,8 +87,12 @@ func gen(c *gin.Context) {
 		return
 	}
 
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
 	id := uuid.New()
-	go func() {
+
+	go func(wg *sync.WaitGroup) {
 		client := &http.Client{}
 		openAIEndpoint := "https://api.openai.com/v1/chat/completions"
 		req, err := http.NewRequest("POST", openAIEndpoint, bytes.NewReader(marshalled))
@@ -113,7 +118,12 @@ func gen(c *gin.Context) {
 			})
 			return
 		}
+
 		Chans[id.String()] = make(chan string, 1)
+		defer close(Chans[id.String()])
+
+		wg.Done()
+
 		for {
 			bufferSize := 1024
 			data := make([]byte, bufferSize)
@@ -125,8 +135,9 @@ func gen(c *gin.Context) {
 				}
 			}
 		}
-	}()
+	}(wg)
 
+	wg.Wait()
 	c.JSON(http.StatusOK, presenter.Std{
 		Ok: true,
 		Result: gin.H{
