@@ -114,8 +114,8 @@ func gen(c *gin.Context) {
 		}
 		Chans[id.String()] = make(chan string, 1)
 		for {
-			// var resp entity.ChatRes
-			data := make([]byte, 1024)
+			bufferSize := 1024
+			data := make([]byte, bufferSize)
 			_, err := res.Body.Read(data)
 			if err == nil {
 				Chans[id.String()] <- string(data)
