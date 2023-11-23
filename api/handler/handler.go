@@ -34,6 +34,9 @@ func get(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
 
 	ch := Chans[id]
+	defer close(ch)
+	defer delete(Chans, id)
+
 	for {
 		// Retrieve data from the channel and write it to the response
 		data := <-ch
@@ -45,8 +48,6 @@ func get(c *gin.Context) {
 			break
 		}
 	}
-	close(ch)
-	delete(Chans, id)
 }
 
 func gen(c *gin.Context) {
