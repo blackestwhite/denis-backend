@@ -89,7 +89,8 @@ func gen(c *gin.Context) {
 	id := uuid.New()
 	go func() {
 		client := &http.Client{}
-		req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(marshalled))
+		openAIEndpoint := "https://api.openai.com/v1/chat/completions"
+		req, err := http.NewRequest("POST", openAIEndpoint, bytes.NewReader(marshalled))
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, presenter.Std{
 				Ok:               false,
