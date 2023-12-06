@@ -63,8 +63,8 @@ func gen(c *gin.Context) {
 	}
 
 	chatCompletion := entity.ChatCompletion{
-		// Model: "gpt-3.5-turbo",
-		Model: "gpt-4-1106-preview",
+		Model: "gpt-3.5-turbo",
+		// Model: "gpt-4-1106-preview",
 		Messages: []entity.Message{
 			{
 				Role: "system",
